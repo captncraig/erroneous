@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/captncraig/erroneous"
 	"github.com/captncraig/erroneous/web"
@@ -11,19 +12,28 @@ import (
 
 func main() {
 	//Initialize the logger (optional)
-	erroneous.Use(&erroneous.ErrorLogger{Store: &erroneous.MemoryStore{}, MachineName: "ny-web42"})
+	erroneous.Use(&erroneous.ErrorLogger{
+		Store: &erroneous.MemoryStore{
+			RollupDuration: 5 * time.Minute,
+		},
+		MachineName: "ny-web42",
+	})
 
 	err := SomeFunction()
 	if err != nil {
 		erroneous.LogError(err)
 	}
 
-	err = SomeWrappingFunction()
-	if err != nil {
-		erroneous.LogError(err)
+	for i := 0; i < 5; i++ {
+		a()
 	}
-	http.Handle("/errors", web.GetMux(erroneous.Default, ""))
+
+	http.Handle("/errors/", web.GetMux(erroneous.Default, ""))
 	http.ListenAndServe(":9090", nil)
+}
+
+func a() {
+	erroneous.LogError(SomeWrappingFunction())
 }
 
 func SomeWrappingFunction() error {

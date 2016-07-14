@@ -10,6 +10,7 @@ import (
 type MemoryStore struct {
 	errors []*Error
 	sync.Mutex
+	RollupDuration time.Duration
 }
 
 // ProtectError marks an error as protected
@@ -17,7 +18,7 @@ func (m *MemoryStore) ProtectError(guid Guid) error {
 	m.Lock()
 	defer m.Unlock()
 	for _, e := range m.errors {
-		if e.GUID == guid {
+		if e.GUID.String() == guid.String() {
 			e.Protected = true
 			return nil
 		}
@@ -29,7 +30,7 @@ func (m *MemoryStore) DeleteError(guid Guid) error {
 	m.Lock()
 	defer m.Unlock()
 	for i, e := range m.errors {
-		if e.GUID == guid {
+		if e.GUID.String() == guid.String() {
 			m.removeAt(i)
 			return nil
 		}
@@ -66,10 +67,13 @@ func (m *MemoryStore) LogError(e *Error) error {
 	var dup *Error
 	m.Lock()
 	defer m.Unlock()
-	for _, err := range m.errors {
-		if e.ErrorKey == err.ErrorKey {
-			dup = err
-			break
+	if m.RollupDuration != 0 {
+		minTime := e.CreationDate.Add(-1 * m.RollupDuration)
+		for _, err := range m.errors {
+			if e.ErrorKey == err.ErrorKey && err.CreationDate.After(minTime) {
+				dup = err
+				break
+			}
 		}
 	}
 	if dup != nil {
@@ -81,10 +85,11 @@ func (m *MemoryStore) LogError(e *Error) error {
 	return nil
 }
 func (m *MemoryStore) GetError(guid Guid) (*Error, error) {
+	fmt.Printf("LOOKING FOR %s\n", guid)
 	m.Lock()
 	defer m.Unlock()
 	for _, e := range m.errors {
-		if e.GUID == guid {
+		if e.GUID.String() == guid.String() {
 			return e, nil
 		}
 	}
